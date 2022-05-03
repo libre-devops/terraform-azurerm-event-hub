@@ -48,7 +48,7 @@ data "http" "user_ip" {
 #checkov:skip=CKV2_AZURE_1:CMKs are not considered in this module
 #checkov:skip=CKV2_AZURE_18:CMKs are not considered in this module
 #checkov:skip=CKV_AZURE_33:Storage logging is not configured by default in this module
-#tfsec:ignore:azure-storage-queue-services-logging-enabled tfsec:ignore:azure-storage-allow-microsoft-service-bypass
+#tfsec:ignore:azure-storage-queue-services-logging-enabled tfsec:ignore:azure-storage-allow-microsoft-service-bypass #tfsec:ignore:azure-storage-default-action-deny
 module "sa" {
   source = "registry.terraform.io/libre-devops/storage-account/azurerm"
 
@@ -56,18 +56,16 @@ module "sa" {
   location = module.rg.rg_location
   tags     = module.rg.rg_tags
 
-  storage_account_name = "st${var.short}${var.loc}${terraform.workspace}01"
-  access_tier          = "Hot"
-  identity_type        = "SystemAssigned"
+  storage_account_name            = "st${var.short}${var.loc}${terraform.workspace}01"
+  access_tier                     = "Hot"
+  identity_type                   = "SystemAssigned"
+  allow_nested_items_to_be_public = true
 
   storage_account_properties = {
 
     // Set this block to enable network rules
     network_rules = {
-      default_action = "Deny"
-      bypass         = ["AzureServices", "Metrics", "Logging"]
-      ip_rules       = [chomp(data.http.user_ip.body)]
-      subnet_ids     = [element(values(module.network.subnets_ids), 0)]
+      default_action = "Allow"
     }
 
     blob_properties = {
@@ -93,11 +91,11 @@ module "sa" {
   }
 }
 
+#tfsec:ignore:azure-storage-no-public-access
 resource "azurerm_storage_container" "event_hub_blob" {
-  name                 = "blob${var.short}${var.loc}${terraform.workspace}01"
-  storage_account_name = module.sa.sa_name
-  type                 = "Block"
-  access_tier          = "Hot"
+  name                  = "blob${var.short}${var.loc}${terraform.workspace}01"
+  storage_account_name  = module.sa.sa_name
+  container_access_type = "container"
 }
 
 module "event_hub_namespace" {
@@ -110,27 +108,20 @@ module "event_hub_namespace" {
   event_hub_namespace_name = "evhns-${var.short}-${var.loc}-${terraform.workspace}-01"
   identity_type            = "SystemAssigned"
   settings = {
-    sku                      = "Standard"
-    capacity                 = 1
-    auto_inflate_enabled     = false
-    maximum_throughput_units = 1
-    zone_redundant           = false
+    sku                  = "Standard"
+    capacity             = 1
+    auto_inflate_enabled = false
+    zone_redundant       = false
 
-    network_rulessets = {
+    network_rulesets = {
       default_action                 = "Deny"
       trusted_service_access_enabled = true
 
       virtual_network_rule = {
-        subnet_id                                       = element(module.network.subnets_ids, 0) // uses sn1
+        subnet_id                                       = element(values(module.network.subnets_ids), 0) // uses sn1
         ignore_missing_virtual_network_service_endpoint = false
       }
-
-      ip_rule = {
-        ip_mask = data.http.user_ip.body
-        action  = "Allow"
-      }
     }
-
   }
 }
 
@@ -160,7 +151,7 @@ module "event_hub" {
 
       destination = {
         name                = "EventHubArchive.AzureBlockBlob"
-        archive_name_format = "${module.event_hub_namespace.name}/${module.event_hub.}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}"
+        archive_name_format = "{Namespace}/{EventHub}/{PartitionId}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}"
         blob_container_name = azurerm_storage_container.event_hub_blob.name
       }
     }
