@@ -1,33 +1,37 @@
-variable "identity_ids" {
-  description = "Specifies a list of user managed identity ids to be assigned to the VM."
-  type        = list(string)
-  default     = []
-}
-
-variable "identity_type" {
-  description = "The Managed Service Identity Type of this Virtual Machine."
+variable "event_hub_name" {
+  description = "Name of the Event Hub"
   type        = string
-  default     = ""
 }
 
 variable "location" {
-  description = "The location for this resource to be put in"
+  description = "Azure location."
+  type        = string
+}
+
+variable "namespace_name" {
+  description = "Name of the Event Hub Namespace."
   type        = string
 }
 
 variable "rg_name" {
-  description = "The name of the resource group, this module does not create a resource group, it is expecting the value of a resource group already exists"
+  description = "Resource group name"
   type        = string
-  validation {
-    condition     = length(var.rg_name) > 1 && length(var.rg_name) <= 24
-    error_message = "Resource group name is not valid."
-  }
+}
+
+variable "settings" {
+  description = "Map used to contain all dynamic settings"
+  type        = map(any)
+  default     = {}
+}
+
+variable "storage_account_id" {
+  description = "Identifier of the storage account ID to be used."
+  type        = string
 }
 
 variable "tags" {
   type        = map(string)
   description = "A map of the tags to use on the resources that are deployed with this module."
-
   default = {
     source = "terraform"
   }
