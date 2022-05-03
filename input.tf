@@ -20,7 +20,7 @@ variable "rg_name" {
 
 variable "settings" {
   description = "Map used to contain all dynamic settings"
-  type        = map(any)
+  type        = any
   default     = {}
 }
 
